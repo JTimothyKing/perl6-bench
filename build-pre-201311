@@ -1,0 +1,106 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+
+use POSIX qw(SIGINT);
+
+use FindBin;
+my $bin_dir = $FindBin::Bin;
+
+
+my %build_steps = (
+    "nqp-parrot" => [
+            [ '@', "make", "realclean" ],
+            [ "git", "clean", "-dxf" ],
+            [ "rm", "-rf", "install", "parrot" ],
+            [ "git", "clone", "-l", "../../parrot/parrot.git" ],
+            [ "perl", "Configure.pl", "--gen-parrot" ],
+            [ "make" ],
+            [ "make", "install" ],
+            [ '@', "ln", "install/bin/nqp", "install/bin/nqp-p" ],
+    ],
+    "nqp-jvm" => [
+            [ '@', "make", "realclean" ],
+            [ "git", "clean", "-dxf" ],
+            [ "rm", "-rf", "install-jvm", "install" ],
+            [ "perl", "ConfigureJVM.pl" ],
+            [ "make" ],
+            [ "make", "install" ],
+            [ "mkdir", "-p", "install/bin" ],
+            [ '@', "ln", "install/nqp", "install/bin/nqp-j" ],
+            [ '@', "ln", "install/bin/nqp", "install/bin/nqp-j" ],
+    ],
+    "rakudo-parrot" => [
+            [ '@', "make", "realclean" ],
+            [ "git", "clean", "-dxf" ],
+            [ "rm", "-rf", "install", "nqp", "parrot" ],
+            [ "git", "clone", "-l", "../../parrot/parrot.git" ],
+            [ "git", "clone", "-l", "../../nqp-parrot/nqp-parrot.git", "nqp" ],
+            [ "perl", "Configure.pl", "--gen-parrot" ],
+            [ "make" ],
+            [ "make", "install" ],
+            [ '@', "ln", "install/bin/perl6", "install/bin/perl6-p" ],
+    ],
+    "rakudo-jvm" => [
+            [ '@', "make", "realclean" ],
+            [ "git", "clean", "-dxf" ],
+            [ "rm", "-rf", "install-jvm", "nqp" ],
+            [ "git", "clone", "-l", "../../nqp-jvm/nqp-jvm.git", "nqp" ],
+            [ "perl", "ConfigureJVM.pl", "--gen-nqp" ],
+            [ "make" ],
+            [ "make", "install" ],
+            [ '@', "mkdir", "-p", "install/bin" ],
+            [ '@', "ln", "install-jvm/bin/perl6", "perl6" ],
+    ],
+);
+
+
+my @all_components = glob "$bin_dir/components/{nqp,rakudo}-*/*";
+
+#print "All component paths:", map("\n  $_", @all_components), "\n";
+
+my @components_to_build =
+    grep { m|/(\d{4})\.(\d{2})/*$| && "$1$2" < "201311" }
+        @all_components;
+
+print "Building the following components:",
+    (map { m|components/+(.*)/*$| && "\n  $1" } @components_to_build),
+    "\n";
+
+COMPONENT: foreach my $component (@components_to_build) {
+    print "\n";
+
+    $component =~ m|components/+(([^/]+).*)$|;
+    my $fullname = $1;
+    my $name = $2;
+
+    my $install_path = "$component/install";
+    if (-d $install_path) {
+        print "Skipping $fullname, because it's already installed\n";
+        next COMPONENT;
+    }
+
+    print "Building $fullname\n";
+    chdir $component;
+    BUILD_STEP: for my $build_step (@{$build_steps{$name}}) {
+        my @build_step = @$build_step;
+        my $ignore_fail;
+        if ($build_step[0] eq '@') {
+            shift @build_step;
+            $ignore_fail = 1;
+        } else {
+            $ignore_fail = undef;
+        }
+
+        print join(' ', @build_step), "\n";
+        system @build_step;
+        exit if ($? & 127) == SIGINT;
+        if (($? >> 8) != 0) {
+            last BUILD_STEP unless $ignore_fail;
+            print "ignoring error; continuing\n";
+        }
+    }
+}
+
+# end
