@@ -25,7 +25,7 @@ compilers is as follows:
     ./bench setup
 
     # Benchmark several different compilers' May 2013 releases
-    export CHECKOUTS='perl5/v5.18.0 nqp/2013.05 nqp-jvm/2013.05 rakudo/2013.05 niecza/v24'
+    export CHECKOUTS='perl5/v5.18.0 nqp-parrot/2013.05 nqp-jvm/2013.05 rakudo-parrot/2013.05 niecza/v24'
     ./bench extract $CHECKOUTS
     ./bench build   $CHECKOUTS
     ./bench time    $CHECKOUTS
