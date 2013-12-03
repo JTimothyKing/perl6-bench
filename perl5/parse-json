@@ -1,0 +1,39 @@
+use 5.10.0;
+use strict;
+use warnings;
+
+use JSON::Tiny;
+
+MAIN(@ARGV);
+
+
+sub MAIN {
+    my $dump = '';
+    if ($_[0] eq '--dump') {
+        $dump = 1;
+        shift;
+    }
+
+    my ($json_file, $count) = @_;
+
+    my $json = do {
+        local $/ = undef;
+        open my $fh, '<', $json_file
+            or die "can't open $json_file";
+        my $json = <$fh>;
+        close $fh;
+        $json;
+    };
+
+    my $json_codec = JSON::Tiny->new;
+
+    for (1 .. $count) {
+        my $data = $json_codec->decode($json);
+        if ($dump) {
+            use Data::Dumper;
+            print Data::Dumper->Dump([$data], ['data']);
+        }
+    }
+}
+
+# end
