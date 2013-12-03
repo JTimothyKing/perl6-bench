@@ -127,10 +127,11 @@ multi to-json(Mu:D $s) {
     die "Can't serialize an object of type " ~ $s.WHAT.perl
 }
 
-sub MAIN($json-file, $count) {
-    my $json := slurp($json-file);
+sub MAIN($json-file, $count, Bool :$dump = False) {
+    my $json := $json-file.IO.slurp;
 
     for ^$count {
         my $data := from-json($json);  #OK
+        say $data.perl if $dump;
     }
 }

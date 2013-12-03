@@ -2,8 +2,8 @@
  {
   name  => 'parse-json',
   skip  => [qw( )],
-  scale => 1 << 3,
-  perl5 => undef,
+  scale => 1,
+  perl5 => [qw( BENCH/perl5/parse-json DATA/panda-projects.json SCALE )],
   perl6 => [qw( BENCH/perl6/parse-json DATA/panda-projects.json SCALE )],
   nqp   => [qw( BENCH/nqp/parse-json   DATA/panda-projects.json SCALE )],
  },
