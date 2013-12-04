@@ -27,7 +27,7 @@ sub MAIN {
 
     my $data;
     for (1 .. $count) {
-        my $json_codec = JSON::Marpa->new;
+        my $json_codec = JSON::Tiny->new;
         $data = $json_codec->decode($json);
         die $json_codec->error unless $data;
     }
