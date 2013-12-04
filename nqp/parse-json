@@ -151,18 +151,27 @@ sub to-json($d) {
     }
 }
 
-sub main($json-file, $count) {
+sub main($dump, $json-file, $count) {
     my $json := slurp($json-file);
 
+    my $data;
     my int $i := 0;
     while $i < $count {
-        my $data := from-json($json);
+        $data := from-json($json);
         $i := $i + 1;
     }
+
+    say(to-json($data)) if $dump;
 }
 
-# XXXX: Perl 6/NQP incompatibility: whether MAIN's args include the program name
 sub MAIN (*@args) {
-    @args.shift if @args == 3;
-    main(|@args);
+    @args.shift; # MAIN's args include the program name
+
+    my $dump := 0;
+    if (@args[0] eq '--dump') {
+        $dump := 1;
+        @args.shift;
+    }
+
+    main($dump, |@args);
 }
