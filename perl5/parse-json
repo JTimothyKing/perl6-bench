@@ -25,13 +25,15 @@ sub MAIN {
         $json;
     };
 
+    my $data;
     for (1 .. $count) {
         my $json_codec = JSON::Tiny->new;
-        my $data = $json_codec->decode($json);
-        if ($dump) {
-            use Data::Dumper;
-            print Data::Dumper->Dump([$data], ['data']);
-        }
+        $data = $json_codec->decode($json) || $json_codec->error;
+    }
+
+    if ($dump) {
+        use Data::Dumper;
+        print Data::Dumper->Dump([$data], ['data']);
     }
 }
 
