@@ -124,8 +124,9 @@ sub add_test_tags {
 sub tests_matching {
     my $query     = shift;
     my @terms     = split /,/ => $query;
-    my @required  = grep /^(?!-)/ => @terms;
+    my @required  = grep /^(?![\-+])/ => @terms;
     my @forbidden = map { substr($_, 1) } grep /^-/ => @terms;
+    my @optional  = map { substr($_, 1) } grep /^\+/ => @terms;
 
     my %known = map {( $_ => 1)} known_tags();
     for my $tag (@required) {
@@ -133,6 +134,9 @@ sub tests_matching {
     }
     for my $tag (@forbidden) {
         die "Unknown forbidden tag '$tag'!\n" unless $known{$tag};
+    }
+    for my $tag (@optional) {
+        die "Unknown optional tag '$tag'!\n" unless $known{$tag};
     }
 
     my @matching;
@@ -144,6 +148,9 @@ sub tests_matching {
         }
         for (@required) {
             next TEST unless $tags{$_};
+        }
+        if (@optional) {
+            next TEST unless grep { $tags{$_} } @optional;
         }
 
         push @matching, $test;
