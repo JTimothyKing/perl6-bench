@@ -2,7 +2,6 @@ use 5.14.0;
 use strict;
 use warnings;
 
-MAIN(@ARGV);
 
 package JSON::Marpa {
     use Marpa::R2;
@@ -112,6 +111,60 @@ MARPA_END
         use constant GRAMMAR => Marpa::R2::Scanless::G->new( { source => \(JSON_SLIF) } );
 
 
+        my %ESCAPE = (
+            '"' => "\"",
+            '\\' => "\\",
+            '/' => "/",
+            'b' => "\b",
+            'f' => "\f",
+            'n' => "\n",
+            'r' => "\r",
+            't' => "\t",
+        );
+
+        sub __unescape_string {
+            my $str = shift;
+
+            # Unescape popular characters
+            if (index($str, '\\u') < 0) {
+                $str =~ s!\\(["\\/bfnrt])!$ESCAPE{$1}!gs;
+                return $str;
+            }
+
+            # Unescape everything else
+            my $buffer = '';
+            while ($str =~ m/\G([^\\]*)\\(?:([^u])|u(.{4}))/gc) {
+                $buffer .= $1;
+
+                # Popular character
+                if ($2) { $buffer .= $ESCAPE{$2} }
+
+                # Escaped
+                else {
+                    my $u_code = $3;
+                    my $ord = hex $u_code;
+
+                    # Surrogate pair
+                    if (($ord & 0xf800) == 0xd800) {
+
+                        # Low surrogate
+                        $str =~ m/\G\\u([Dd][C-Fc-f]..)/gc
+                          or die("Missing low-surrogate, after \\u$u_code");
+
+                        # Pair
+                        $ord = 0x10000 + ($ord - 0xd800) * 0x400 + (hex($1) - 0xdc00);
+                    }
+
+                    # Character
+                    $buffer .= pack 'U', $ord;
+                }
+            }
+
+            # The rest
+            return $buffer . substr $str, pos($str), length($str);
+        }
+
+
         sub bracketed { $_[2] }
 
         sub pairlist { shift; return { map { @$_ } @_ } }
@@ -120,26 +173,12 @@ MARPA_END
 
         sub string {
             my $json_string = $_[1];
+            print STDERR "string $json_string\n" if DEBUG >= 2;
 
             $json_string =~ s/^"//;
             $json_string =~ s/"$//;
 
-            $json_string =~ s/\\u([0-9A-Fa-f]{4})/chr(hex($1))/eg;
-
-            for my $escape (
-                ['\\\\' => "\\"],
-                ['\\/' => "/"],
-                ['\\b' => "\b"],
-                ['\\f' => "\f"],
-                ['\\n' => "\n"],
-                ['\\r' => "\r"],
-                ['\\t' => "\t"],
-            ) {
-                my ($from, $to) = @$escape;
-                $json_string =~ s/\Q$from\E/\Q$to\E/g;
-            }
-
-            return $json_string;
+            return __unescape_string($json_string);
         }
 
         sub number { 0 + $_[1] }
@@ -159,7 +198,7 @@ MARPA_END
         sub new {
             my $class = shift;
             my $recognizer = Marpa::R2::Scanless::R->new( {
-                grammar => \(GRAMMAR),
+                grammar => (GRAMMAR),
                 trace_terminals => (DEBUG),
                 trace_values => (DEBUG),
             } );
@@ -238,6 +277,9 @@ MARPA_END
     }
 }
 
+
+MAIN(@ARGV);
+
 sub MAIN {
     my $dump = '';
     if ($_[0] eq '--dump') {
@@ -259,7 +301,8 @@ sub MAIN {
     my $data;
     for (1 .. $count) {
         my $json_codec = JSON::Marpa->new;
-        $data = $json_codec->decode($json) || $json_codec->error;
+        $data = $json_codec->decode($json);
+        die $json_codec->error unless $data;
     }
 
     if ($dump) {
