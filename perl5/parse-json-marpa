@@ -1,0 +1,273 @@
+use 5.14.0;
+use strict;
+use warnings;
+
+MAIN(@ARGV);
+
+package JSON::Marpa {
+    use Marpa::R2;
+    use Encode ();
+
+    package JSON::Marpa::Bool {
+        use overload '0+' => sub { ${$_[0]} }, '""' => sub { ${$_[0]} }, fallback => 1;
+    }
+
+    our $FALSE = bless \(my $false = 0), 'JSON::Marpa::Bool';
+    our $TRUE  = bless \(my $true  = 1), 'JSON::Marpa::Bool';
+
+
+    package JSON::Marpa::_Decoder {
+        use constant DEBUG => 0;
+
+        use constant JSON_SLIF => <<'MARPA_END';
+:default ::= action => ::first
+:start ::= JSON
+
+JSON ::= Object | Array
+
+Object ::= openbrace PairList closebrace action => bracketed
+
+PairList ::= Pair* separator => comma action => pairlist
+
+Pair ::= String colon Value action => pair
+
+Array ::= openbracket ArrayList closebracket action => bracketed
+
+ArrayList ::= Value* separator => comma action => arraylist
+
+Value ::= Object
+    | Array
+    | String
+    | Number
+    | Boolean
+    | Null
+
+String ::= string action => string
+
+Number ::= number action => number
+
+Boolean ::= true action => true
+    | false action => false
+
+Null ::= null action => null
+
+
+string ~ quote string_chars quote
+
+string_chars ~ char*
+
+char ~ [^"\\\t\n] | str_escape
+
+str_escape ~ backslash escape_char
+    | backslash u xdigit xdigit xdigit xdigit
+
+escape_char ~ ["\\/bfnrt]
+
+xdigit ~ [0-9a-f]:i
+
+
+number ~ integer
+    | integer fraction
+    | integer exponent
+    | integer fraction exponent
+
+integer ~ zero | whole | minus whole
+
+whole ~ [1-9] optional_digits
+
+optional_digits ~ [\d]*
+
+fraction ~ dot digits
+
+exponent ~ e digits | e plus digits | e minus digits
+
+e ~ 'e':i
+
+digits ~ [\d]+
+
+
+true ~ 'true'
+false ~ 'false'
+null ~ 'null'
+
+
+:discard ~ whitespace
+whitespace ~ [\s]+
+comma ~ [,]
+openbrace ~ '{'
+closebrace ~ '}'
+openbracket ~ '['
+closebracket ~ ']'
+quote ~ '"'
+colon ~ ':'
+backslash ~ '\'
+u ~ 'u'
+zero ~ '0'
+plus ~ '+'
+minus ~ '-'
+dot ~ '.'
+
+MARPA_END
+
+        use constant GRAMMAR => Marpa::R2::Scanless::G->new( { source => \(JSON_SLIF) } );
+
+
+        sub bracketed { $_[2] }
+
+        sub pairlist { shift; return { map { @$_ } @_ } }
+        sub pair { [ $_[1] => $_[3] ]  }
+        sub arraylist { shift; \@_ }
+
+        sub string {
+            my $json_string = $_[1];
+
+            $json_string =~ s/^"//;
+            $json_string =~ s/"$//;
+
+            $json_string =~ s/\\u([0-9A-Fa-f]{4})/chr(hex($1))/eg;
+
+            for my $escape (
+                ['\\\\' => "\\"],
+                ['\\/' => "/"],
+                ['\\b' => "\b"],
+                ['\\f' => "\f"],
+                ['\\n' => "\n"],
+                ['\\r' => "\r"],
+                ['\\t' => "\t"],
+            ) {
+                my ($from, $to) = @$escape;
+                $json_string =~ s/\Q$from\E/\Q$to\E/g;
+            }
+
+            return $json_string;
+        }
+
+        sub number { 0 + $_[1] }
+        sub true { $JSON::Marpa::TRUE }
+        sub false { $JSON::Marpa::FALSE }
+        sub null { undef }
+
+        sub _last_expression_msg {
+            my ($self) = @_;
+            my $recognizer = $self->{recognizer};
+            my ( $g1_start, $g1_length ) = $recognizer->last_completed('Value');
+            return 'No value was successfully parsed' if not defined $g1_start;
+            my $last_expression = $recognizer->substring( $g1_start, $g1_length );
+            return "Last value successfully parsed was: $last_expression";
+        }
+
+        sub new {
+            my $class = shift;
+            my $recognizer = Marpa::R2::Scanless::R->new( {
+                grammar => \(GRAMMAR),
+                trace_terminals => (DEBUG),
+                trace_values => (DEBUG),
+            } );
+
+            bless {
+                recognizer => $recognizer,
+            }, $class;
+        }
+
+        sub decode {
+            my ($self, $bytes) = @_;
+
+            my $recognizer = $self->{recognizer};
+
+            if ( not eval { $recognizer->read(\$bytes); 1 } ) {
+                my $eval_error = $@;
+                die $self->_last_expression_msg, "\n", $eval_error;
+            }
+
+            my $decoded = $recognizer->value( $self );
+            if ( not defined $decoded ) {
+                die $self->_last_expression_msg, "\n",
+                    "No parse was found, after reading the entire input\n";
+            }
+
+            return $decoded;
+        }
+    }
+
+
+
+    sub new {
+        my $class = shift;
+        bless @_ ? @_ > 1 ? {@_} : {%{$_[0]}} : {}, $class;
+    }
+
+    sub error {
+        $_[0]->{error} = $_[1] if @_ > 1;
+        return $_[0]->{error};
+    }
+
+    # Unicode encoding detection
+    my $UTF_PATTERNS = {
+        'UTF-32BE' => qr/^\x00{3}[^\x00]/,
+        'UTF-32LE' => qr/^[^\x00]\x00{3}/,
+        'UTF-16BE' => qr/^(?:\x00[^\x00]){2}/,
+        'UTF-16LE' => qr/^(?:[^\x00]\x00){2}/
+    };
+
+    sub decode {
+        my ($self, $bytes) = @_;
+
+        # Clean start
+        $self->error(undef);
+
+        # Missing input
+        $self->error('Missing or empty input') and return undef unless $bytes; ## no critic (undef)
+
+        # Remove BOM
+        $bytes =~ s/^(?:\357\273\277|\377\376\0\0|\0\0\376\377|\376\377|\377\376)//g;
+
+        # Wide characters
+        $self->error('Wide character in input') and return undef ## no critic (undef)
+         unless utf8::downgrade($bytes, 1);
+
+        # Detect and decode Unicode
+        my $encoding = 'UTF-8';
+        $bytes =~ $UTF_PATTERNS->{$_} and $encoding = $_ for keys %$UTF_PATTERNS;
+
+        $bytes = eval { Encode::decode($encoding, $bytes, 1) };
+
+        my $decoded = eval { JSON::Marpa::_Decoder->new->decode($bytes) }
+            or $self->error($@);
+
+        return $decoded;
+    }
+}
+
+sub MAIN {
+    my $dump = '';
+    if ($_[0] eq '--dump') {
+        $dump = 1;
+        shift;
+    }
+
+    my ($json_file, $count) = @_;
+
+    my $json = do {
+        local $/ = undef;
+        open my $fh, '<', $json_file
+            or die "can't open $json_file";
+        my $json = <$fh>;
+        close $fh;
+        $json;
+    };
+
+    for (1 .. $count) {
+        my $json_codec = JSON::Marpa->new;
+        my $data = $json_codec->decode($json);
+        if ($dump) {
+            if ($data) {
+                use Data::Dumper;
+                print Data::Dumper->Dump([$data], ['data']);
+            } else {
+                print $json_codec->error;
+            }
+        }
+    }
+}
+
+# end

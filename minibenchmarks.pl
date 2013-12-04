@@ -8,6 +8,12 @@
   nqp   => [qw( BENCH/nqp/parse-json   DATA/panda-projects.json SCALE )],
  },
  {
+  name  => 'parse-json-marpa',
+  skip  => [qw( )],
+  scale => 1,
+  perl5 => [qw( BENCH/perl5/parse-json-marpa DATA/panda-projects.json SCALE )],
+ },
+ {
   name  => 'rc-forest-fire',
   skip  => [qw( niecza.nqp nqp-moarvm p6.pl p6.js_v8 )],
   scale => 1 << 3,
