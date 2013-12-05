@@ -1,0 +1,43 @@
+use 5.12.0;
+use strict;
+use warnings;
+
+use File::Compare ();
+use File::Spec ();
+use File::Temp ();
+
+use constant FILES_MB => 8;
+
+MAIN(@ARGV);
+
+sub MAIN {
+    my ($num_MB) = @_;
+
+    my @files = do {
+        my $dir_template = File::Spec->catdir(
+            File::Spec->tmpdir, 'file-compare-XXXXXXXXXX'
+        );
+        my $dir = File::Temp::tempdir($dir_template, CLEANUP => 1);
+        my $num_files = FILES_MB;
+
+        map {
+            my ($fh, $filename) = File::Temp::tempfile(DIR => $dir);
+            for (1 .. 1024) {
+                print $fh pack('S[512]', map(int(rand(65536)), 1 .. 512));
+            }
+            $fh->close;
+            die "bad file size: " . (-s $filename) . " bytes"
+                unless -s $filename == 1024*1024;
+            $filename;
+        } 1 .. $num_files;
+    };
+
+    for (1 .. $num_MB) {
+        my $file1 = shift @files;
+        my $file2 = $files[ rand @files ];
+        File::Compare::compare($file1, $file2);
+        push @files, $file1;
+    }
+}
+
+# end

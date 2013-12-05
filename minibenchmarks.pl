@@ -33,4 +33,15 @@
   perl6 => [qw( BENCH/perl6/rc-man-or-boy-test SCALE )],
   nqp   => [qw( BENCH/nqp/rc-man-or-boy-test   SCALE )],
  },
+ {
+  name  => 'file-compare',
+  skip  => [qw( )],
+  scale => 1 << 7,
+  x_label => 'MB Compared',
+  y_label => 'MB per Second',
+  perl5 => [qw( BENCH/perl5/file-compare SCALE )],
+  perl6 => undef,
+  nqp   => undef,
+ },
+
 ]
