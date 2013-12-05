@@ -1,0 +1,32 @@
+use v6;
+
+use File::Compare; # imports files_are_equal
+use File::Temp; # imports tempfile
+
+constant NUM_FILES = 8;
+constant MB_PER_FILE = 8;
+
+sub MAIN($num_MB) {
+    my @files = do {
+        my $template = 'file-compare-**********.dat';
+        my $bytes_per_file = MB_PER_FILE * 1024*1024;
+
+        for ^NUM_FILES {
+            my ($filename,$fh) = tempfile($template);
+            $fh.close;
+            shell "head -c $bytes_per_file /dev/random > $filename";
+            die "bad file size: {$filename.IO.s}  bytes"
+                unless $filename.IO.s == $bytes_per_file;
+            $filename;
+        }
+    };
+
+    for ^($num_MB/MB_PER_FILE) {
+        my $file1 = @files.shift;
+        my $file2 = @files.pick;
+        files_are_equal($file1, $file2);
+        @files.push: $file1;
+    }
+}
+
+# end
