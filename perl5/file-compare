@@ -6,7 +6,8 @@ use File::Compare ();
 use File::Spec ();
 use File::Temp ();
 
-use constant FILES_MB => 8;
+use constant NUM_FILES => 8;
+use constant MB_PER_FILE => 8;
 
 MAIN(@ARGV);
 
@@ -18,21 +19,18 @@ sub MAIN {
             File::Spec->tmpdir, 'file-compare-XXXXXXXXXX'
         );
         my $dir = File::Temp::tempdir($dir_template, CLEANUP => 1);
-        my $num_files = FILES_MB;
+        my $bytes_per_file = MB_PER_FILE * 1024*1024;
 
         map {
-            my ($fh, $filename) = File::Temp::tempfile(DIR => $dir);
-            for (1 .. 1024) {
-                print $fh pack('S[512]', map(int(rand(65536)), 1 .. 512));
-            }
-            $fh->close;
+            my (undef, $filename) = File::Temp::tempfile(DIR => $dir);
+            system("head -c $bytes_per_file /dev/random > $filename");
             die "bad file size: " . (-s $filename) . " bytes"
-                unless -s $filename == 1024*1024;
+                unless -s $filename == $bytes_per_file;
             $filename;
-        } 1 .. $num_files;
+        } 1 .. NUM_FILES;
     };
 
-    for (1 .. $num_MB) {
+    for (1 .. $num_MB/MB_PER_FILE) {
         my $file1 = shift @files;
         my $file2 = $files[ rand @files ];
         File::Compare::compare($file1, $file2);
