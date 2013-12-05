@@ -22,7 +22,7 @@ sub MAIN {
         my $bytes_per_file = MB_PER_FILE * 1024*1024;
 
         map {
-            my (undef, $filename) = File::Temp::tempfile(DIR => $dir);
+            my (undef, $filename) = File::Temp::tempfile(DIR => $dir, OPEN => 0);
             system("head -c $bytes_per_file /dev/random > $filename");
             die "bad file size: " . (-s $filename) . " bytes"
                 unless -s $filename == $bytes_per_file;
