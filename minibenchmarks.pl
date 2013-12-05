@@ -40,7 +40,7 @@
   x_label => 'MB Compared',
   y_label => 'MB per Second',
   perl5 => [qw( BENCH/perl5/file-compare SCALE )],
-  perl6 => undef,
+  perl6 => [qw( BENCH/perl6/file-compare SCALE )],
   nqp   => undef,
  },
 
