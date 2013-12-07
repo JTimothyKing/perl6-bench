@@ -4,7 +4,8 @@ html-template - a trivial benchmark test for the HTML::Template module.
 
 Depends on the data/html-template.tmpl tenplate file.
 
-Usage: perl perl5/html-template [--test] template_file iteration_count
+Usage: perl perl5/html-template template_file iteration_count
+       perl perl5/html-template --test
 
 Run with --test as the first argument to invoke the built-in unit test.
 
@@ -29,7 +30,8 @@ sub MAIN {
     my $template_file = $test ? 'data/html-template.tmpl' : shift;
     my $count = $test ? 1 : shift;
 
-    die "Usage: perl perl5/html-template [--test] template_file iteration_count\n" 
+    die "Usage: perl perl5/html-template template_file iteration_count\n",
+        "       perl perl5/html-template --test\n"
         unless $template_file && defined($count);
 
     # output to /dev/null unless in test mode
