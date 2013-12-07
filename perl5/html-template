@@ -1,0 +1,72 @@
+=pod
+
+html-template - a trivial benchmark test for the HTML::Template module.
+
+Depends on the data/html-template.tmpl tenplate file.
+
+Usage: perl perl5/html-template [--test] template_file iteration_count
+
+Run with --test as the first argument to invoke the built-in unit test.
+
+=cut
+
+use 5.10.0;
+use strict;
+use warnings;
+
+use HTML::Template;
+use File::Spec;
+use File::Temp;
+use IO::File;
+
+
+MAIN(@ARGV);
+
+
+sub MAIN {
+    $_[0] //= '';
+    my $test = $_[0] eq '--test' ? 1 : 0; shift if $test;
+    my $template_file = $test ? 'data/html-template.tmpl' : shift;
+    my $count = $test ? 1 : shift;
+
+    die "Usage: perl perl5/html-template [--test] template_file iteration_count\n" 
+        unless $template_file && defined($count);
+
+    # output to /dev/null unless in test mode
+    my $outfile = $test ? File::Temp::tmpnam() : File::Spec->devnull();
+    my $out = IO::File->new($outfile, 'w') or
+        die "$outfile: failed to open: $!\n";
+
+    if ($test) {
+        eval "use Test::More tests => 1;";
+        diag("testing using $template_file template for $count iterations\n");
+        diag("outputting to $outfile\n");
+    }
+
+    for (1 .. $count) {
+        # open the html template
+        my $template = HTML::Template->new(filename => $template_file);
+
+        # fill in some parameters
+        $template->param(MONSTROUS => "monstrous");
+        $template->param(THE => "the");
+        $template->param(COMPENDIUM => "compendium");
+
+        # print the template output
+        print $out $template->output or
+            die "$outfile: write failed: $!\n";
+    }
+
+    $out->close;
+
+    if ($test) {
+        my $cmpcmd = "diff --brief --ignore-case data/html-template.html $outfile";
+        diag("compare cmd: $cmpcmd\n");
+        system($cmpcmd);
+        ok( $? == 0, 'verifying output');
+    }
+
+    unlink($outfile);
+}
+
+# end
