@@ -1,6 +1,7 @@
 [
  {
   name  => 'parse-json',
+  tags => [qw(parse-json)],
   skip  => [qw( )],
   scale => 1,
   perl5 => [qw( BENCH/perl5/parse-json DATA/panda-projects.json SCALE )],
@@ -9,6 +10,7 @@
  },
  {
   name  => 'parse-json-marpa',
+  tags => [qw(parse-json)],
   skip  => [qw( )],
   scale => 1,
   perl5 => [qw( BENCH/perl5/parse-json-marpa DATA/panda-projects.json SCALE )],
@@ -43,5 +45,26 @@
   perl6 => [qw( BENCH/perl6/file-compare SCALE )],
   nqp   => undef,
  },
-
+ {
+  name  => 'fractal-tree',
+  tags => [qw(fractal-tree)],
+  skip  => [qw( )],
+  scale => 1 << 4,
+  x_label => 'Branches Instantiated',
+  y_label => 'Branches per Second',
+  perl5 => undef,
+  perl6 => [qw( BENCH/perl6/fractal-tree SCALE )],
+  nqp   => undef,
+ },
+ {
+  name  => 'fractal-tree-2',
+  tags => [qw(fractal-tree)],
+  skip  => [qw( )],
+  scale => 1,
+  x_label => 'Iterations',
+  y_label => 'Iterations per Second',
+  perl5 => undef,
+  perl6 => [qw( BENCH/perl6/fractal-tree 15 SCALE )],
+  nqp   => undef,
+ },
 ]
