@@ -46,6 +46,16 @@
   nqp   => undef,
  },
  {
+  name  => 'html-template',
+  skip  => [qw( )],
+  scale => 1,
+  x_label => 'HTML Pages Generated',
+  y_label => 'HTML Pages per Second',
+  perl5 => [qw( BENCH/perl5/html-template DATA/html-template.tmpl SCALE )],
+  perl6 => undef,
+  nqp   => undef,
+ },
+ {
   name  => 'fractal-tree',
   tags => [qw(fractal-tree)],
   skip  => [qw( )],
