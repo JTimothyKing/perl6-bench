@@ -53,7 +53,7 @@
   x_label => 'Branches Instantiated',
   y_label => 'Branches per Second',
   perl5 => undef,
-  perl6 => [qw( BENCH/perl6/fractal-tree SCALE )],
+  perl6 => [qw( BENCH/perl6/fractal-tree --num-branches=SCALE )],
   nqp   => undef,
  },
  {
@@ -64,7 +64,7 @@
   x_label => 'Iterations',
   y_label => 'Iterations per Second',
   perl5 => undef,
-  perl6 => [qw( BENCH/perl6/fractal-tree 15 SCALE )],
+  perl6 => [qw( BENCH/perl6/fractal-tree --num-branches=15 --num-iterations=SCALE )],
   nqp   => undef,
  },
 ]
