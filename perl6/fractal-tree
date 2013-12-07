@@ -1,5 +1,18 @@
 use v6;
 
+=begin pod
+
+Generates and renders in SVG a fractal tree, instantiating and calling methods on lots
+of objects in the process.
+
+Usage:
+  fractal-tree --help
+  fractal-tree [--num-branches=<Int>] [--num-iterations=<Int>]
+     [--pixels-high=<Real>] [--branch-scale=<Real>] [--branch-angles=<Any>] 
+  fractal-tree <num-branches> [<num-iterations>] 
+
+=end pod
+
 class FractalTree {
     has Int $.num-branches = 15; # including the trunk
     has Real $.trunk-length = 0.5;
