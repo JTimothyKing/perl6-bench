@@ -1,0 +1,204 @@
+use 5.14.0;
+use strict;
+use warnings;
+
+use Getopt::Long ();
+use Math::Trig qw(pi);
+use Scalar::Util ();
+
+=pod
+
+Generates and renders in SVG a fractal tree, instantiating and calling methods on lots
+of objects in the process.
+
+Usage:
+  fractal-tree [--num-branches=<Int>] [--num-iterations=<Int>]
+     [--pixels-high=<Real>] [--branch-scale=<Real>] [--branch-angles=<Any>] 
+
+=cut
+
+package FractalTree {
+    use Math::Trig qw(pi);
+
+    sub new {
+        my ($class, @args) = @_;
+        bless {
+            num_branches => 15,
+            trunk_length => 0.5,
+            branch_scale => 0.5,
+            branch_angles => [-(pi)/5, (pi)/5],
+            @args,
+        }, $class;
+    }
+
+    sub num_branches { shift->{num_branches} }
+    sub trunk_length { shift->{trunk_length} }
+    sub branch_scale { shift->{branch_scale} }
+    sub branch_angles { shift->{branch_angles} }
+
+    package Branch {
+        sub new {
+            my ($class, @args) = @_;
+            bless {
+                twigs => [],
+                @args
+            }, $class;
+        }
+
+        sub length { shift->{length} }
+        sub direction { shift->{direction} }
+        sub twigs { shift->{twigs} }
+
+        sub attach {
+            my $self = shift;
+            push @{$self->{twigs}}, @_;
+        }
+    }
+
+    sub trunk {
+        my $self = shift;
+
+        my $trunk = $self->{trunk};
+        return $trunk if defined $trunk;
+
+        $trunk = $self->{trunk}
+            = Branch->new(length => $self->{trunk_length}, direction => 0);
+
+        my $branches_remaining = $self->{num_branches} - 1;
+        my @branches_to_twig = ($trunk);
+
+        while ($branches_remaining > 0) {
+            my $branch = shift @branches_to_twig;
+
+            my $twig_length = $branch->length * $self->{branch_scale};
+            my @branch_angles = @{$self->{branch_angles}};
+            my $num_twigs = @branch_angles;
+            $num_twigs = $branches_remaining if $num_twigs > $branches_remaining;
+            for (1 .. $num_twigs) {
+                my $angle = shift @branch_angles;
+                my $twig_direction = $branch->direction + $angle;
+                my $twig = Branch->new(
+                    length => $twig_length,
+                    direction => $twig_direction,
+                );
+                $branch->attach($twig);
+
+                $branches_remaining --;
+                push @branches_to_twig, $twig;
+            }
+        }
+
+        return $trunk;
+    }
+}
+
+
+sub render_svg {
+    my $tree = shift;
+
+    my %args = (
+        trunk_rgb => [ 176,111,37 ],
+        trunk_stroke_width => 15,
+        branch_scale => 0.5,
+        @_,
+    );
+    my ($scale, $rotate, $translate, $trunk_rgb, $trunk_stroke_width, $branch_scale)
+        = @args{qw(scale rotate translate trunk_rgb trunk_stroke_width branch_scale)};
+
+    my @rendered;
+
+    push @rendered, <<'END_HEADER';
+<?xml version='1.0' encoding='utf-8' standalone='no'?>
+<!DOCTYPE svg PUBLIC '-//W3C//DTD SVG 1.1//EN' 'http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd'>
+<svg width='100%' height='100%' version='1.1' xmlns='http://www.w3.org/2000/svg'>
+END_HEADER
+
+    my $render_subtree; # a weak ref, because recursively referred to
+    # ...with a companion strong ref that goes out of scope at the end of the block
+    my $strong_sub_ref = $render_subtree = sub {
+        my $branch = shift;
+        my $start = shift;
+        my $indent = shift;
+
+        my %args = @_;
+        my ($rgb, $stroke_width) = @args{qw(rgb stroke_width)};
+
+        my $length = $branch->length * $scale;
+        my $direction = $branch->direction + $rotate;
+
+        my ($x1, $y1) = @$start;
+
+        my $x2 = $x1 + $length * cos($direction);
+        my $y2 = $y1 + $length * sin($direction);
+
+        my $rgb_triple = join(',', @$rgb);
+        push @rendered,
+            ' ' x $indent
+            . "<line x1=\"$x1\" y1=\"$y1\" x2=\"$x2\" y2=\"$y2\" "
+            . "style=\"stroke:rgb($rgb_triple);stroke-width:$stroke_width\"/>\n";
+
+        my $twig_rgb = [ map(int($_ * $branch_scale), @$rgb) ];
+        my $twig_stroke_width = $stroke_width * $branch_scale;
+        $twig_stroke_width = 1 if $twig_stroke_width < 1;
+        for my $twig (@{$branch->twigs}) {
+            $render_subtree->($twig, [$x2, $y2], $indent+2,
+                rgb => $twig_rgb,
+                stroke_width => $twig_stroke_width,
+            );
+        }
+    };
+    Scalar::Util::weaken($render_subtree);
+
+    $render_subtree->($tree->trunk, $translate, 2,
+        rgb => $trunk_rgb, stroke_width => $trunk_stroke_width);
+
+    push @rendered, <<'END_FOOTER';
+</svg>
+END_FOOTER
+
+    return @rendered;
+}
+
+
+MAIN(@ARGV);
+
+sub MAIN {
+    my $num_branches = 15;
+    my $num_iterations = 1;
+    my $pixels_high = 1000;
+    my $branch_scale = 0.5;
+    my @branch_angles = (-(pi)/5, (pi)/5);
+
+    Getopt::Long::GetOptions(
+        'num-branches=i' => \$num_branches,
+        'num-iterations=i' => \$num_iterations,
+        'pixels-high=f' => \$pixels_high,
+        'branch-scale=f' => \$branch_scale,
+        'branch-angles=f' => \@branch_angles,
+    );
+
+    for (1 .. $num_iterations) {
+        # Guarantee that the entire tree will fit into a rectangle of 1 unit tall
+        my $trunk_length = 1.0 - $branch_scale;
+
+        my $tree = FractalTree->new(
+            num_branches => $num_branches,
+            trunk_length => $trunk_length,
+            branch_scale => $branch_scale,
+            branch_angles => \@branch_angles,
+        );
+
+        # Guaranteed maximum width (partial geometric series with r = $branch_scale)
+        my $pixels_wide = $pixels_high * $trunk_length * 2 * $branch_scale / ( 1 - $branch_scale );
+
+        print render_svg($tree,
+            scale => $pixels_high,
+            rotate => (-(pi)/2),
+            translate => [$pixels_wide/2, $pixels_high],
+            trunk_stroke_width => ($pixels_high/50),
+            branch_scale => $branch_scale,
+        );
+    }
+}
+
+# end
