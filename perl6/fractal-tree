@@ -8,8 +8,8 @@ of objects in the process.
 Usage:
   fractal-tree --help
   fractal-tree [--num-branches=<Int>] [--num-iterations=<Int>]
-     [--pixels-high=<Real>] [--branch-scale=<Real>] [--branch-angles=<Any>] 
-  fractal-tree <num-branches> [<num-iterations>] 
+     [--pixels-high=<Real>] [--branch-scale=<Real>] [--branch-angles=<Real>]*
+  fractal-tree <num-branches> [<num-iterations>]
 
 =end pod
 

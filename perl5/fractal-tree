@@ -13,7 +13,7 @@ of objects in the process.
 
 Usage:
   fractal-tree [--num-branches=<Int>] [--num-iterations=<Int>]
-     [--pixels-high=<Real>] [--branch-scale=<Real>] [--branch-angles=<Any>] 
+     [--pixels-high=<Real>] [--branch-scale=<Real>] [--branch-angles=<Real>]*
 
 =cut
 
