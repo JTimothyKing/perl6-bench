@@ -169,7 +169,8 @@ sub MAIN {
     my $branch_scale = 0.5;
     my @branch_angles = (-(pi)/5, (pi)/5);
 
-    Getopt::Long::GetOptions(
+    Getopt::Long::GetOptionsFromArray(
+        \@_,
         'num-branches=i' => \$num_branches,
         'num-iterations=i' => \$num_iterations,
         'pixels-high=f' => \$pixels_high,
