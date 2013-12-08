@@ -1,0 +1,142 @@
+use v6;
+
+=begin pod
+
+Generates and renders in SVG a fractal tree, instantiating and calling methods on lots
+of objects in the process.
+
+Usage:
+  fractal-tree --help
+  fractal-tree [--num-branches=<Int>] [--num-iterations=<Int>]
+     [--pixels-high=<Real>] [--branch-scale=<Real>] [--branch-angles=<Real>] 
+  fractal-tree <num-branches> [<num-iterations>] 
+
+=end pod
+
+class FractalTree {
+    has $.num-branches = 15; # including the trunk
+    has $.trunk-length = 0.5;
+    has $.branch-scale = 0.5;
+    has @.branch-angles = (-pi/5, pi/5);
+
+    class Branch {
+        has $.length;
+        has $.direction;
+        has @.twigs;
+
+        method attach (@new-twigs) { @!twigs.push(@new-twigs) }
+    }
+
+    has $!trunk;
+
+    method trunk {
+        return $!trunk if defined $!trunk;
+
+        $!trunk = Branch.new(length => $!trunk-length, direction => 0);
+
+        my $branches-remaining = $!num-branches - 1;
+        my @branches-to-twig = ($!trunk);
+
+        while ($branches-remaining > 0) {
+            my $branch = @branches-to-twig.shift;
+
+            my $twig-length = $branch.length * $!branch-scale;
+            my $num-twigs = @!branch-angles.elems min $branches-remaining;
+            my @twig-directions = $branch.direction <<+<< @!branch-angles[^$num-twigs];
+            my Branch @twigs = ( Branch.new(
+                length => $twig-length,
+                direction => $_,
+            ) for @twig-directions );
+
+            $branch.attach(@twigs);
+
+            $branches-remaining -= @twigs.elems;
+            @branches-to-twig.push(@twigs);
+        }
+
+        return $!trunk;
+    }
+}
+
+
+sub render-svg (
+    $tree,
+    :$scale, :$rotate, :@translate,
+    :@trunk-rgb = [176,111,37],
+    :$trunk-stroke-width = 15,
+    :$branch-scale = 0.5,
+) {
+    my @rendered;
+
+    @rendered.push(q:to/END_HEADER/);
+    <?xml version='1.0' encoding='utf-8' standalone='no'?>
+    <!DOCTYPE svg PUBLIC '-//W3C//DTD SVG 1.1//EN' 'http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd'>
+    <svg width='100%' height='100%' version='1.1' xmlns='http://www.w3.org/2000/svg'>
+    END_HEADER
+
+    sub render-subtree ($branch, @start, $indent, :@rgb, :$stroke-width) {
+        my $length = $branch.length * $scale;
+        my $direction = $branch.direction + $rotate;
+
+        my ($x1, $y1) = @start;
+
+        my $x2 = $x1 + $length * $direction.cos;
+        my $y2 = $y1 + $length * $direction.sin;
+
+        @rendered.push(
+            ' ' x $indent
+            ~ "<line x1=\"$x1\" y1=\"$y1\" x2=\"$x2\" y2=\"$y2\" "
+            ~ "style=\"stroke:rgb({join(',',@rgb)});stroke-width:$stroke-width\"/>\n"
+        );
+
+        for $branch.twigs -> $twig {
+            render-subtree($twig, [$x2, $y2], $indent+2,
+                rgb => [ (truncate($_ * $branch-scale) for @rgb) ],
+                stroke-width => ( ($stroke-width * $branch-scale) max 1 ),
+            );
+        }
+    }
+
+    render-subtree($tree.trunk, @translate, 2,
+        rgb => @trunk-rgb, stroke-width => $trunk-stroke-width);
+
+    @rendered.push(q:to/END_FOOTER/);
+    </svg>
+    END_FOOTER
+}
+
+
+multi sub MAIN (
+    Int :$num-branches = 15,
+    Int :$num-iterations = 1,
+    Real :$pixels-high = 1000,
+    Real :$branch-scale = 0.5,
+    :$branch-angles = [-pi/5, pi/5], # Real, can be specified multiple times
+) {
+    for @$branch-angles { if $_ !~~ Real
+        { note "Invalid --branch-angles=$_; must be a real number"; exit -1 } }
+
+    for ^$num-iterations {
+        # Guarantee that the entire tree will fit into a rectangle of 1 unit tall
+        my $trunk-length = 1 - $branch-scale;
+
+        my $tree = FractalTree.new(:$num-branches, :$trunk-length, :$branch-scale, :$branch-angles);
+
+        # Guaranteed maximum width (partial geometric series with r = $branch-scale)
+        my $pixels-wide = $pixels-high * $trunk-length * 2 * $branch-scale / ( 1 - $branch-scale);
+
+        print render-svg($tree,
+            scale => $pixels-high,
+            rotate => -pi/2,
+            translate => [$pixels-wide/2, $pixels-high],
+            trunk-stroke-width => ($pixels-high/50),
+            :$branch-scale,
+        );
+    }
+}
+
+multi sub MAIN (Int $num-branches, Int $num-iterations = 1) {
+    MAIN(:$num-branches, :$num-iterations);
+}
+
+# end
