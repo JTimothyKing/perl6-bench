@@ -9,6 +9,8 @@ Usage:
   fractal-tree --help
   fractal-tree [--num-branches=<Int>] [--num-iterations=<Int>]
      [--pixels-high=<Real>] [--branch-scale=<Real>] [--branch-angles=<Real>] 
+     [--show-leaves=<Real>]
+     [--outfile=<Str>]
   fractal-tree <num-branches> [<num-iterations>] 
 
 =end pod
@@ -65,6 +67,8 @@ sub render-svg (
     :@trunk-rgb = [176,111,37],
     :$trunk-stroke-width = 15,
     :$branch-scale = 0.5,
+    :$show-leaves = False,
+    :@leaf-rgb = [0,224,71],
 ) {
     my @rendered;
 
@@ -74,9 +78,16 @@ sub render-svg (
     <svg width='100%' height='100%' version='1.1' xmlns='http://www.w3.org/2000/svg'>
     END_HEADER
 
-    sub render-subtree ($branch, @start, $indent, :@rgb, :$stroke-width) {
+    sub render-subtree ($branch, @start, $indent, :@rgb is copy, :$stroke-width is copy) {
+        my @twigs = $branch.twigs;
+
         my $length = $branch.length * $scale;
         my $direction = $branch.direction + $rotate;
+
+        if $show-leaves && !@twigs {
+            @rgb = @leaf-rgb;
+            $stroke-width = $length;
+        }
 
         my ($x1, $y1) = @start;
 
@@ -89,12 +100,18 @@ sub render-svg (
             ~ "style=\"stroke:rgb({join(',',@rgb)});stroke-width:$stroke-width\"/>\n"
         );
 
-        for $branch.twigs -> $twig {
-            render-subtree($twig, [$x2, $y2], $indent+2,
-                rgb => [ (truncate($_ * $branch-scale) for @rgb) ],
-                stroke-width => ( ($stroke-width * $branch-scale) max 1 ),
-            );
+        if @twigs {
+            my @twig-rgb = (truncate($_ * $branch-scale) for @rgb);
+            my $twig-stroke-width = ($stroke-width * $branch-scale) max 1;
+            for @twigs -> $twig {
+                render-subtree($twig, [$x2, $y2], $indent+2,
+                    rgb => @twig-rgb,
+                    stroke-width => $twig-stroke-width,
+                );
+            }
         }
+
+
     }
 
     render-subtree($tree.trunk, @translate, 2,
@@ -112,9 +129,13 @@ multi sub MAIN (
     Real :$pixels-high = 1000,
     Real :$branch-scale = 0.5,
     :$branch-angles = [-pi/5, pi/5], # Real, can be specified multiple times
+    Bool :$show-leaves = False,
+    Str :$outfile = '-',
 ) {
     for @$branch-angles { if $_ !~~ Real
         { note "Invalid --branch-angles=$_; must be a real number"; exit -1 } }
+
+    $*OUT = open $outfile, :w unless $outfile eq '-';
 
     for ^$num-iterations {
         # Guarantee that the entire tree will fit into a rectangle of 1 unit tall
@@ -131,8 +152,11 @@ multi sub MAIN (
             translate => [$pixels-wide/2, $pixels-high],
             trunk-stroke-width => ($pixels-high/50),
             :$branch-scale,
+            :$show-leaves,
         );
     }
+
+    $*OUT.close;
 }
 
 multi sub MAIN (Int $num-branches, Int $num-iterations = 1) {

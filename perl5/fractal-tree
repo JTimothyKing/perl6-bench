@@ -14,6 +14,8 @@ of objects in the process.
 Usage:
   fractal-tree [--num-branches=<Int>] [--num-iterations=<Int>]
      [--pixels-high=<Real>] [--branch-scale=<Real>] [--branch-angles=<Real>]*
+     [--show-leaves=<Real>]
+     [--outfile=<Str>]
 
 =cut
 
@@ -100,10 +102,14 @@ sub render_svg {
         trunk_rgb => [ 176,111,37 ],
         trunk_stroke_width => 15,
         branch_scale => 0.5,
+        show_leaves => '',
+        leaf_rgb => [ 0, 224, 71 ],
         @_,
     );
-    my ($scale, $rotate, $translate, $trunk_rgb, $trunk_stroke_width, $branch_scale)
-        = @args{qw(scale rotate translate trunk_rgb trunk_stroke_width branch_scale)};
+    my ($scale, $rotate, $translate, $trunk_rgb, $trunk_stroke_width, $branch_scale,
+        $show_leaves, $leaf_rgb)
+        = @args{qw(scale rotate translate trunk_rgb trunk_stroke_width branch_scale
+            show_leaves leaf_rgb)};
 
     my @rendered;
 
@@ -123,8 +129,13 @@ END_HEADER
         my %args = @_;
         my ($rgb, $stroke_width) = @args{qw(rgb stroke_width)};
 
+        my $twigs = $branch->twigs;
+
         my $length = $branch->length * $scale;
         my $direction = $branch->direction + $rotate;
+
+        ($rgb, $stroke_width) = ($leaf_rgb, $length)
+            if $show_leaves && !@$twigs;
 
         my ($x1, $y1) = @$start;
 
@@ -137,14 +148,16 @@ END_HEADER
             . "<line x1=\"$x1\" y1=\"$y1\" x2=\"$x2\" y2=\"$y2\" "
             . "style=\"stroke:rgb($rgb_triple);stroke-width:$stroke_width\"/>\n";
 
-        my $twig_rgb = [ map(int($_ * $branch_scale), @$rgb) ];
-        my $twig_stroke_width = $stroke_width * $branch_scale;
-        $twig_stroke_width = 1 if $twig_stroke_width < 1;
-        for my $twig (@{$branch->twigs}) {
-            $render_subtree->($twig, [$x2, $y2], $indent+2,
-                rgb => $twig_rgb,
-                stroke_width => $twig_stroke_width,
-            );
+        if (@$twigs) {
+            my $twig_rgb = [ map(int($_ * $branch_scale), @$rgb) ];
+            my $twig_stroke_width = $stroke_width * $branch_scale;
+            $twig_stroke_width = 1 if $twig_stroke_width < 1;
+            for my $twig (@$twigs) {
+                $render_subtree->($twig, [$x2, $y2], $indent+2,
+                    rgb => $twig_rgb,
+                    stroke_width => $twig_stroke_width,
+                );
+            }
         }
     };
     Scalar::Util::weaken($render_subtree);
@@ -168,6 +181,8 @@ sub MAIN {
     my $pixels_high = 1000;
     my $branch_scale = 0.5;
     my @branch_angles = (-(pi)/5, (pi)/5);
+    my $show_leaves = '';
+    my $outfile = '-';
 
     Getopt::Long::GetOptionsFromArray(
         \@_,
@@ -176,7 +191,12 @@ sub MAIN {
         'pixels-high=f' => \$pixels_high,
         'branch-scale=f' => \$branch_scale,
         'branch-angles=f' => \@branch_angles,
+        'show-leaves' => \$show_leaves,
+        'outfile=s' => \$outfile,
     );
+
+    open STDOUT, '>', $outfile or die "can't open $outfile for writing"
+        unless $outfile eq '-';
 
     for (1 .. $num_iterations) {
         # Guarantee that the entire tree will fit into a rectangle of 1 unit tall
@@ -198,6 +218,7 @@ sub MAIN {
             translate => [$pixels_wide/2, $pixels_high],
             trunk_stroke_width => ($pixels_high/50),
             branch_scale => $branch_scale,
+            show_leaves => $show_leaves,
         );
     }
 }
