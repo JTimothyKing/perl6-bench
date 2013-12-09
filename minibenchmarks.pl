@@ -37,6 +37,7 @@
  },
  {
   name  => 'file-compare',
+  tags => [qw(file-compare)],
   skip  => [qw( )],
   scale => 1 << 7,
   x_label => 'MB Compared',
