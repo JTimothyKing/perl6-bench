@@ -52,8 +52,8 @@
   scale => 1,
   x_label => 'HTML Pages Generated',
   y_label => 'HTML Pages per Second',
-  perl5 => [qw( BENCH/perl5/html-template DATA/html-template.tmpl SCALE )],
-  perl6 => undef,
+  perl5 => [qw( BENCH/perl5/html-template DATA/html-template-small.tmpl SCALE )],
+  perl6 => [qw( BENCH/perl6/html-template DATA/html-template-small.tmpl SCALE )],
   nqp   => undef,
  },
  {

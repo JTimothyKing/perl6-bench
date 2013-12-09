@@ -1,74 +1,76 @@
-=pod
+=begin pod
 
 html-template - a trivial benchmark test for the HTML::Template module.
 
 Depends on the data/html-template.tmpl tenplate file.
 
-Usage: perl perl5/html-template template_file iteration_count
-       perl perl5/html-template --test
+Usage: perl6 perl6/html-template template-file iteration-count
+       perl6 perl6/html-template --test
 
 Run with --test as the first argument to invoke the built-in unit test.
 
-=cut
+=end pod
 
-use 5.10.0;
-use strict;
-use warnings;
+use v6;
 
 use HTML::Template;
-use File::Spec;
 use File::Temp;
-use IO::File;
 
 
-MAIN(@ARGV);
-
-
-sub MAIN {
-    $_[0] //= '';
-    my $test = $_[0] eq '--test' ? 1 : 0; shift if $test;
-    my $template_file = $test ? 'data/html-template.tmpl' : shift;
-    my $count = $test ? 1 : shift;
-
-    die "Usage: perl perl5/html-template template_file iteration_count\n",
-        "       perl perl5/html-template --test\n"
-        unless $template_file && defined($count);
-
-    # output to /dev/null unless in test mode
-    my $outfile = $test ? File::Temp::tmpnam() : File::Spec->devnull();
-    my $out = IO::File->new($outfile, 'w') or
-        die "$outfile: failed to open: $!\n";
-
-    if ($test) {
-        eval "use Test::More tests => 1;";
-        diag("testing using $template_file template for $count iterations\n");
-        diag("outputting to $outfile\n");
+multi MAIN(Str $template-file, Int $iteration-count) {
+    if !($template-file && defined($iteration-count)) {
+        note "Usage: perl6 perl6/html-template template-file iteration-count\n",
+             "       perl6 perl6/html-template --test\n";
+        exit 1;
     }
 
-    for (1 .. $count) {
+    # output to /dev/null
+    my $outfile = IO::Spec.devnull;
+
+    render $template-file, $iteration-count, $outfile;
+}
+
+multi MAIN(Bool :$test) { 
+
+    # output to a temp file so we can validate it later
+    my ($outfile) = (tempfile(:!unlink))[0];
+    my $template-file = 'data/html-template-small.tmpl';
+    my $iteration-count = 1;
+
+    use Test;
+    plan 1;
+    note "# testing using $template-file template for $iteration-count iterations";
+    note "# outputting to $outfile";
+
+    render $template-file, $iteration-count, $outfile;
+
+    my $cmpcmd = "diff --brief --ignore-case data/html-template-small.html $outfile";
+    note "# compare cmd: $cmpcmd";
+    my $stat = shell $cmpcmd;
+    ok $stat, 'verifying output' 
+        and unlink($outfile); # leave $outfile if compare fails
+}
+
+sub render (Str $template-file, Int $iteration-count, Str $outfile) {
+
+    my $out = open $outfile, :w or
+        die "$outfile: failed to open: $!\n";
+
+    for ^$iteration-count {
         # open the html template
-        my $template = HTML::Template->new(filename => $template_file);
+        my $template = HTML::Template.from_file($template-file);
 
         # fill in some parameters
-        $template->param(MONSTROUS => "monstrous");
-        $template->param(THE => "the");
-        $template->param(COMPENDIUM => "compendium");
+        $template.param( Pair.new(key => 'MONSTROUS', value => 'monstrous') );
+        $template.param( Pair.new(key => 'THE', value => 'the') );
+        $template.param( Pair.new(key => 'COMPENDIUM', value => 'compendium') );
 
         # print the template output
-        print $out $template->output or
+        $out.print($template.output) or
             die "$outfile: write failed: $!\n";
     }
 
-    $out->close;
-
-    if ($test) {
-        my $cmpcmd = "diff --brief --ignore-case data/html-template.html $outfile";
-        diag("compare cmd: $cmpcmd\n");
-        system($cmpcmd);
-        ok( $? == 0, 'verifying output');
-    }
-
-    unlink($outfile);
+    $out.close;
 }
 
 # end
