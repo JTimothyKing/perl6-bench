@@ -47,6 +47,7 @@
  },
  {
   name  => 'html-template',
+  tags => [qw(html-template)],
   skip  => [qw( )],
   scale => 1,
   x_label => 'HTML Pages Generated',
