@@ -19,6 +19,8 @@ Usage:
 
 =cut
 
+use constant MAX_BRANCHES => 4*1024*1024;
+
 package FractalTree {
     use Math::Trig qw(pi);
 
@@ -194,6 +196,9 @@ sub MAIN {
         'show-leaves' => \$show_leaves,
         'outfile=s' => \$outfile,
     );
+
+    die "Invalid --num-branches; must be less than ", MAX_BRANCHES, "\n"
+        unless $num_branches <= MAX_BRANCHES;
 
     open STDOUT, '>', $outfile or die "can't open $outfile for writing"
         unless $outfile eq '-';
