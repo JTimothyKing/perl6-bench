@@ -11,7 +11,6 @@ Usage:
      [--pixels-high=<Real>] [--branch-scale=<Real>] [--branch-angles=<Real>]*
      [--show-leaves=<Real>]
      [--outfile=<Str>]
-  fractal-tree <num-branches> [<num-iterations>]
 
 =end pod
 
@@ -158,10 +157,6 @@ multi sub MAIN (
     }
 
     $*OUT.close;
-}
-
-multi sub MAIN (Int $num-branches, Int $num-iterations = 1) {
-    MAIN(:$num-branches, :$num-iterations);
 }
 
 # end
