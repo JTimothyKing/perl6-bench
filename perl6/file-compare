@@ -14,7 +14,7 @@ sub MAIN($num_MB) {
         for ^NUM_FILES {
             my ($filename,$fh) = tempfile($template);
             $fh.close;
-            shell "head -c $bytes_per_file /dev/random > $filename";
+            shell "head -c $bytes_per_file /dev/urandom > $filename";
             die "bad file size: {$filename.IO.s}  bytes"
                 unless $filename.IO.s == $bytes_per_file;
             $filename;

@@ -23,7 +23,7 @@ sub MAIN {
 
         map {
             my (undef, $filename) = File::Temp::tempfile(DIR => $dir, OPEN => 0);
-            system("head -c $bytes_per_file /dev/random > $filename");
+            system("head -c $bytes_per_file /dev/urandom > $filename");
             die "bad file size: " . (-s $filename) . " bytes"
                 unless -s $filename == $bytes_per_file;
             $filename;
